@@ -1,0 +1,75 @@
+apiVersion: templates.gatekeeper.sh/v1beta1
+kind: ConstraintTemplate
+metadata:
+  annotations:
+    description: Controls Linux capabilities.
+  name: customk8spspcapabilities
+spec:
+  crd:
+    spec:
+      names:
+        kind: CustomK8sPSPCapabilities
+      validation:
+        openAPIV3Schema:
+          properties:
+            allowedCapabilities:
+              items:
+                type: string
+              type: array
+            requiredDropCapabilities:
+              items:
+                type: string
+              type: array
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package capabilities
+        violation[{"msg": msg}] {
+          container := input.review.object.spec.containers[_]
+          exempt_falcon_container(container)
+          has_disallowed_capabilities(container)
+          msg := sprintf("container <%v> has a disallowed capability. Allowed capabilities are %v", [container.name, get_default(input.parameters, "allowedCapabilities", "NONE")])
+        }
+        violation[{"msg": msg}] {
+          container := input.review.object.spec.containers[_]
+          exempt_falcon_container(container)
+          missing_drop_capabilities(container)
+          msg := sprintf("container <%v> is not dropping all required capabilities. Container must drop all of %v", [container.name, input.parameters.requiredDropCapabilities])
+        }
+        violation[{"msg": msg}] {
+          container := input.review.object.spec.initContainers[_]
+          exempt_falcon_init_container(container)
+          has_disallowed_capabilities(container)
+          msg := sprintf("init container <%v> has a disallowed capability. Allowed capabilities are %v", [container.name, get_default(input.parameters, "allowedCapabilities", "NONE")])
+        }
+        violation[{"msg": msg}] {
+          container := input.review.object.spec.initContainers[_]
+          exempt_falcon_init_container(container)
+          missing_drop_capabilities(container)
+          msg := sprintf("init container <%v> is not dropping all required capabilities. Container must drop all of %v", [container.name, input.parameters.requiredDropCapabilities])
+        }
+        has_disallowed_capabilities(container) {
+          allowed := {c | c := input.parameters.allowedCapabilities[_]}
+          not allowed["*"]
+          capabilities := {c | c := container.securityContext.capabilities.add[_]}
+          count(capabilities - allowed) > 0
+        }
+        missing_drop_capabilities(container) {
+          must_drop := {c | c := input.parameters.requiredDropCapabilities[_]}
+          dropped := {c | c := container.securityContext.capabilities.drop[_]}
+          count(must_drop - dropped) > 0
+        }
+        get_default(obj, param, _default) = out {
+          out = obj[param]
+        }
+        get_default(obj, param, _default) = out {
+          not obj[param]
+          not obj[param] == false
+          out = _default
+        }
+        exempt_falcon_container(container) {
+            container.name != "crowdstrike-falcon-container"
+        }
+        exempt_falcon_init_container(container) {
+            container.name != "crowdstrike-falcon-init-container"
+        }
