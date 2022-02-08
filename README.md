@@ -1,6 +1,6 @@
 # falcon-container-opa-templates
 
-This repository show-cases how to implement allow-listing of Falcon Container for OPA Gatekeeper based admission.
+This repository show-cases how to implement allow-listing of Falcon Container for OPA Gatekeeper based admission. If you are looking to implement OpenShift SCC based admission instead, please consult [sister repository](https://github.com/isimluk/falcon-container-scc).
 
 An example of OPA Gatekeeper based admission may be Anthos Config Manager (ACM). ACM provides [library of Kubernetes Hardening templates](https://cloud.google.com/anthos-config-management/docs/reference/constraint-template-library) that may be used as guidance for pod admission to the cluster.
 
